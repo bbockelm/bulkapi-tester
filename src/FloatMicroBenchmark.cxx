@@ -18,7 +18,7 @@ int main(int argc, char *argv[]) {
 
     // Handle all the argument parsing up front.
     if (argc != 5) {
-        fprintf(stderr, "Usage: %s read|write|writelz4|writezip|writelzma|writeuncompressed bulk|fastreader|standard events fname\n", argv[0]);
+        fprintf(stderr, "Usage: %s read|write|writelz4|writezip|writelzma|writeuncompressed bulk|bulkinline|fastreader|standard events fname\n", argv[0]);
         return 1;
     }
     bool do_read = false, do_lz4 = false, do_zip = false, do_uncompressed = false, do_lzma = false;
@@ -37,15 +37,15 @@ int main(int argc, char *argv[]) {
         return 1;
     }
     bool do_fast_reader = false;
-    bool do_std;
+    bool do_std = false;
+    bool do_inline = false;
     if (!strcmp(argv[2], "standard")) {
         do_std = true;
-    } else if (!strcmp(argv[2], "bulk")) {
-        do_std = false;
+    } else if (!strcmp(argv[2], "bulkinline")) {
+        do_inline = true;
     } else if (!strcmp(argv[2], "fastreader")) {
-        do_std = false;
         do_fast_reader = true;
-    } else {
+    } else if (strcmp(argv[2], "bulk")) {
         fprintf(stderr, "Third argument must be either 'bulk', 'fastreader', or 'standard'\n");
     }
     Long64_t events;
@@ -86,11 +86,11 @@ int main(int argc, char *argv[]) {
             TTreeReaderValueFast<float> myF(myReader, "myFloat");
             myReader.SetEntry(0);
             if (ROOT::Internal::TTreeReaderValueBase::kSetupMatch != myF.GetSetupStatus()) {
-               printf("TTreeReaderValueFast<float> failed to initialize.\n");
+               printf("TTreeReaderValueFast<float> failed to initialize.  Status code: %d\n", myF.GetSetupStatus());
                return 1;
             }
             if (myReader.GetEntryStatus() != TTreeReader::kEntryValid) {
-               printf("TTreeReaderFast failed to initialize.\n");
+               printf("TTreeReaderFast failed to initialize.  Entry status: %d\n", myReader.GetEntryStatus());
                return 1;
             }
             Long64_t idx = 0;
@@ -103,6 +103,46 @@ int main(int argc, char *argv[]) {
                     return 1;
                 }
                 idx++;
+            }
+        } else if (do_inline) {
+            printf("Using inline bulk read APIs.\n");
+            TBufferFile branchbuf(TBuffer::kWrite, 32*1024);
+            TTree *tree = dynamic_cast<TTree*>(hfile->Get("T"));
+            if (!tree) {
+                std::cout << "Failed to fetch tree named 'T' from input file.\n";
+                return 1;
+            }
+            TBranch *branchF = tree->GetBranch("myFloat");
+            if (!branchF) {
+                std::cout << "Unable to find branch 'myFloat' in tree 'T'\n";
+                return 1;
+            }
+            float idx_f = 1;
+            Long64_t evt_idx = 0;
+            while (events) {
+                auto count = branchF->GetEntriesSerialized(evt_idx, branchbuf);
+                if (R__unlikely(count < 0)) {
+                    printf("Failed to get entries via the 'serialized' method for index %d.\n", evt_idx);
+                    return 1;
+                }
+                if (events > count) {
+                    events -= count;
+                } else {
+                    events = 0;
+                }
+                float *entry = reinterpret_cast<float*>(branchbuf.GetCurrent());
+                for (Int_t idx=0; idx<count; idx++) {
+                    idx_f++;
+                    Int_t *buf = reinterpret_cast<Int_t*>(&entry[idx]);
+                    *buf = __builtin_bswap32(*buf);
+
+                    if (R__unlikely((evt_idx < 16000000) && (entry[idx] != idx_f))) {
+                    //if (R__unlikely((evt_idx < 16000000) && (entry[idx] == -idx_f))) {
+                        printf("Incorrect value on myFloat branch: %f (event %ld)\n", entry[idx], evt_idx + idx);
+                        return 1;
+                    }
+                }
+                evt_idx += count;
             }
         } else {
             printf("Using bulk read APIs.\n");
