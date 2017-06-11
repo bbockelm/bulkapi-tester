@@ -5,6 +5,7 @@
 #include "TBufferFile.h"
 #include "TFile.h"
 #include "TTree.h"
+#include "TStopwatch.h"
 #include "TTreeReader.h"
 #include "TTreeReaderValue.h"
 #include "TTreeReaderFast.h"
@@ -17,16 +18,22 @@ int main(int argc, char *argv[]) {
 
     // Handle all the argument parsing up front.
     if (argc != 5) {
-        fprintf(stderr, "Usage: %s read|write bulk|standard events fname\n", argv[0]);
+        fprintf(stderr, "Usage: %s read|write|writelz4|writezip|writelzma|writeuncompressed bulk|fastreader|standard events fname\n", argv[0]);
         return 1;
     }
-    bool do_read;
+    bool do_read = false, do_lz4 = false, do_zip = false, do_uncompressed = false, do_lzma = false;
     if (!strcmp(argv[1], "read")) {
         do_read = true;
-    } else if (!strcmp(argv[1], "write")) {
-        do_read = false;
-    } else {
-        fprintf(stderr, "Second argument must be either 'read' or 'write'\n");
+    } else if (!strcmp(argv[1], "writelz4")) {
+        do_lz4 = true;
+    } else if (!strcmp(argv[1], "writezip")) {
+        do_zip = true;
+    } else if (!strcmp(argv[1], "writelzma")) {
+        do_lzma = true;
+    } else if (!strcmp(argv[1], "writeuncompressed")) {
+        do_uncompressed = true;
+    } else if (strcmp(argv[1], "write")) {
+        fprintf(stderr, "Second argument must be 'read', 'write', 'writelz4', 'writezip', or 'writeuncompressed'\n");
         return 1;
     }
     bool do_fast_reader = false;
@@ -39,7 +46,7 @@ int main(int argc, char *argv[]) {
         do_std = false;
         do_fast_reader = true;
     } else {
-        fprintf(stderr, "Third argument must be either 'bulk' or 'standard'\n");
+        fprintf(stderr, "Third argument must be either 'bulk', 'fastreader', or 'standard'\n");
     }
     Long64_t events;
     try {
@@ -54,6 +61,7 @@ int main(int argc, char *argv[]) {
     hfile = new TFile(fname);
     if (do_read) {
         printf("Starting read of file %s.\n", fname);
+            TStopwatch sw;
 
         if (do_std) {
             printf("Using standard read APIs.\n");
@@ -62,6 +70,7 @@ int main(int argc, char *argv[]) {
             TTreeReaderValue<float> myF(myReader, "myFloat");
             Long64_t idx = 0;
             float idx_f = 1;
+            sw.Start();
             while (myReader.Next()) {
                 if (R__unlikely(idx == events)) {break;}
                 idx_f++;
@@ -75,6 +84,15 @@ int main(int argc, char *argv[]) {
             printf("Using faster reader APIs.\n");
             TTreeReaderFast myReader("T", hfile);
             TTreeReaderValueFast<float> myF(myReader, "myFloat");
+            myReader.SetEntry(0);
+            if (ROOT::Internal::TTreeReaderValueBase::kSetupMatch != myF.GetSetupStatus()) {
+               printf("TTreeReaderValueFast<float> failed to initialize.\n");
+               return 1;
+            }
+            if (myReader.GetEntryStatus() != TTreeReader::kEntryValid) {
+               printf("TTreeReaderFast failed to initialize.\n");
+               return 1;
+            }
             Long64_t idx = 0;
             float idx_f = 1;
             for (auto it : myReader) {
@@ -100,6 +118,7 @@ int main(int argc, char *argv[]) {
                 std::cout << "Unable to find branch 'myFloat' in tree 'T'\n";
                 return 1;
             }
+            sw.Start();
             float idx_f = 1;
             Long64_t evt_idx = 0;
             while (events) {
@@ -116,8 +135,10 @@ int main(int argc, char *argv[]) {
                 float *entry = reinterpret_cast<float*>(branchbuf.GetCurrent());
                 for (Int_t idx=0; idx<count; idx++) {
                     idx_f++;
+/*
                     Int_t *buf = reinterpret_cast<Int_t*>(&entry[idx]);
                     *buf = __builtin_bswap32(*buf);
+*/
 
                     if (R__unlikely((evt_idx < 16000000) && (entry[idx] != idx_f))) {
                         printf("Incorrect value on myFloat branch: %f (event %ld)\n", entry[idx], evt_idx + idx);
@@ -127,14 +148,28 @@ int main(int argc, char *argv[]) {
                 evt_idx += count;
             }
         }
+        sw.Stop();
         printf("Successful read of all events.\n");
+        printf("Total elapsed time (seconds) for bulk APIs: %.2f\n", sw.RealTime());
     } else {
         if (!do_std) {
             printf("There are currently no bulk APIs for writing.\n");
             return 1;
         }
         hfile = new TFile(fname, "RECREATE", "TTree float micro benchmark ROOT file");
-        hfile->SetCompressionLevel(0);  // Disable compression.
+        if (do_lz4) {
+            hfile->SetCompressionLevel(7);  // High enough to get L4Z-HC
+            hfile->SetCompressionAlgorithm(4);  // Enable LZ4 codec.
+        } else if (do_uncompressed) {
+            hfile->SetCompressionLevel(0); // No compression at all.
+        } else if (do_zip) {
+            hfile->SetCompressionLevel(6);
+            hfile->SetCompressionAlgorithm(1);
+        } else if (do_lzma) {
+            hfile->SetCompressionLevel(6);
+            hfile->SetCompressionAlgorithm(2); // LZMA
+        }
+        // Otherwise, we keep with the current ROOT defaults.
         tree = new TTree("T", "A ROOT tree of floats.");
         float f = 2;
         TBranch *branch2 = tree->Branch("myFloat", &f, 320000, 1);
