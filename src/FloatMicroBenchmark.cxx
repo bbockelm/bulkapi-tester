@@ -8,8 +8,8 @@
 #include "TStopwatch.h"
 #include "TTreeReader.h"
 #include "TTreeReaderValue.h"
-#include "TTreeReaderFast.h"
-#include "TTreeReaderValueFast.h"
+#include "ROOT/TTreeReaderFast.hxx"
+#include "ROOT/TTreeReaderValueFast.hxx"
 
 int main(int argc, char *argv[]) {
 
@@ -82,8 +82,8 @@ int main(int argc, char *argv[]) {
             }
         } else if (do_fast_reader) {
             printf("Using faster reader APIs.\n");
-            TTreeReaderFast myReader("T", hfile);
-            TTreeReaderValueFast<float> myF(myReader, "myFloat");
+            ROOT::Experimental::TTreeReaderFast myReader("T", hfile);
+            ROOT::Experimental::TTreeReaderValueFast<float> myF(myReader, "myFloat");
             myReader.SetEntry(0);
             if (ROOT::Internal::TTreeReaderValueBase::kSetupMatch != myF.GetSetupStatus()) {
                printf("TTreeReaderValueFast<float> failed to initialize.  Status code: %d\n", myF.GetSetupStatus());
