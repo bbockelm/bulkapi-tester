@@ -7,7 +7,7 @@ add_executable(testSillyStruct MainSillyStruct.cxx)
 target_link_libraries(testSillyStruct SillyStruct)
 
 add_executable(floatMicroBenchmark FloatMicroBenchmark.cxx)
-add_executable(floatFastReaderMicroBenchmark FloatFastReaderMicroBenchmark.cxx)
+add_executable(floatDoubleMicroBenchmark FloatDoubleMicroBenchmark.cxx)
 target_link_libraries(floatMicroBenchmark ${ROOT_LIBRARIES})
-target_link_libraries(floatFastReaderMicroBenchmark ${ROOT_LIBRARIES})
+target_link_libraries(floatDoubleMicroBenchmark ${ROOT_LIBRARIES})
 
