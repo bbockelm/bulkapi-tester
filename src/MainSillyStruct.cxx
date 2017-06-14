@@ -8,6 +8,7 @@
 #include "TStopwatch.h"
 #include "TTreeReader.h"
 #include "TTreeReaderValue.h"
+#include "ROOT/TBulkBranchRead.hxx"
 
 #include "SillyStruct.h"
 
@@ -64,7 +65,7 @@ int main(int argc, char *argv[]) {
               return 1;
            }
            sw.Start();
-           auto count = branchF->GetEntriesFast(0, branchbuf);
+           auto count = branchF->GetBulkRead().GetEntriesFast(0, branchbuf);
            if (count < 0) {
               std::cout << "Failed to get entries via the 'fast' method.\n";
               return 1;

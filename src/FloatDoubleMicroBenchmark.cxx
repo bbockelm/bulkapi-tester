@@ -10,6 +10,7 @@
 #include "TTreeReaderValue.h"
 #include "ROOT/TTreeReaderFast.hxx"
 #include "ROOT/TTreeReaderValueFast.hxx"
+#include "ROOT/TBulkBranchRead.hxx"
 
 int main(int argc, char *argv[]) {
 
@@ -138,7 +139,7 @@ int main(int argc, char *argv[]) {
             float idx_f = 1;
             Long64_t evt_idx = 0;
             while (events) {
-                auto count = branchF->GetEntriesSerialized(evt_idx, branchbuf);
+                auto count = branchF->GetBulkRead().GetEntriesSerialized(evt_idx, branchbuf);
                 if (R__unlikely(count < 0)) {
                     printf("Failed to get entries via the 'serialized' method for index %d.\n", evt_idx);
                     return 1;
@@ -190,12 +191,12 @@ int main(int argc, char *argv[]) {
                 //printf("Fetching entries on event %lld.\n", evt_idx);
                 if (count == 0) {
                     //printf("Fetching entries for myFloat branch.\n");
-                    count = branchF->GetEntriesFast(evt_idx, branchbuf);
+                    count = branchF->GetBulkRead().GetEntriesFast(evt_idx, branchbuf);
                     idx = 0;
                 }
                 if (count2 == 0) {
                     //printf("Fetching entries for myDouble branch.\n");
-                    count2 = branchG->GetEntriesFast(evt_idx, branchbuf2);
+                    count2 = branchG->GetBulkRead().GetEntriesFast(evt_idx, branchbuf2);
                     idx2 = 0;
                 }
                 if (R__unlikely((count < 0) || (count2 < 0))) {

@@ -10,6 +10,7 @@
 #include "TTreeReaderValue.h"
 #include "ROOT/TTreeReaderFast.hxx"
 #include "ROOT/TTreeReaderValueFast.hxx"
+#include "ROOT/TBulkBranchRead.hxx"
 
 int main(int argc, char *argv[]) {
 
@@ -120,7 +121,7 @@ int main(int argc, char *argv[]) {
             float idx_f = 1;
             Long64_t evt_idx = 0;
             while (events) {
-                auto count = branchF->GetEntriesSerialized(evt_idx, branchbuf);
+                auto count = branchF->GetBulkRead().GetEntriesSerialized(evt_idx, branchbuf);
                 if (R__unlikely(count < 0)) {
                     printf("Failed to get entries via the 'serialized' method for index %d.\n", evt_idx);
                     return 1;
@@ -162,7 +163,7 @@ int main(int argc, char *argv[]) {
             float idx_f = 1;
             Long64_t evt_idx = 0;
             while (events) {
-                auto count = branchF->GetEntriesFast(evt_idx, branchbuf);
+                auto count = branchF->GetBulkRead().GetEntriesFast(evt_idx, branchbuf);
                 if (R__unlikely(count < 0)) {
                     printf("Failed to get entries via the 'fast' method for index %d.\n", evt_idx);
                     return 1;
