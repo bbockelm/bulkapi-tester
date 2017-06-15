@@ -17,7 +17,7 @@ int main(int argc, char *argv[]) {
     TFile *hfile;
     TTree *tree;
 
-    if (argc != 2) {
+    if (argc != 3) {
         fprintf(stderr, "Usage: %s [read|write] [bulk|standard]\n", argv[0]);
         return 1;
     }
@@ -26,7 +26,7 @@ int main(int argc, char *argv[]) {
     bool do_std = false;
     if (!strcmp(argv[2], "standard")) {
         do_std = true;
-    } else if (!strcmp(argv[2], "bulk")) {
+    } else if (strcmp(argv[2], "bulk")) {
         fprintf(stderr, "Second argument must either be 'bulk' or 'standard'.\n");
         return 1;
     }
@@ -51,6 +51,7 @@ int main(int argc, char *argv[]) {
            }
 
         } else {
+           std::cout << "Reading using bulk APIs.\n";
 
            // Read using bulk APIs.
            TBufferFile branchbuf(TBuffer::kWrite, 10000);
@@ -59,9 +60,9 @@ int main(int argc, char *argv[]) {
               std::cout << "Failed to fetch tree named 'T' from input file.\n";
               return 1;
            }
-           TBranch *branchF = tree->GetBranch("myFloat");
+           TBranch *branchF = tree->GetBranch("a");
            if (!branchF) {
-              std::cout << "Unable to find branch 'myFloat' in tree 'T'\n";
+              std::cout << "Unable to find branch 'a' in tree 'T'\n";
               return 1;
            }
            sw.Start();
